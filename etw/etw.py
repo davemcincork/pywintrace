@@ -380,7 +380,7 @@ class EventConsumer:
             if tdh.ERROR_SUCCESS != et.ProcessTrace(ct.byref(trace_handle), 1, None, None):
                 end_capture.set()
 
-            if end_capture.isSet():
+            if end_capture.is_set():
                 break
 
     @staticmethod
