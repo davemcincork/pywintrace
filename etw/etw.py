@@ -60,17 +60,14 @@ class TraceProperties:
         # In this structure, the LoggerNameOffset and other string fields reside immediately
         # after the EVENT_TRACE_PROPERTIES structure. So allocate enough space for the
         # structure and any strings we are using.
-        buf_size = ct.sizeof(et.EVENT_TRACE_PROPERTIES) + \
-            2 * ct.sizeof(ct.c_wchar) * max_str_len
+        buf_size = ct.sizeof(et.EVENT_TRACE_PROPERTIES) + 2 * ct.sizeof(ct.c_wchar) * max_str_len
 
         # noinspection PyCallingNonCallable
         self._buf = (ct.c_char * buf_size)()
-        self._props = ct.cast(ct.pointer(self._buf),
-                              ct.POINTER(et.EVENT_TRACE_PROPERTIES))
+        self._props = ct.cast(ct.pointer(self._buf), ct.POINTER(et.EVENT_TRACE_PROPERTIES))
 
         if props:
-            ct.memmove(self._props, props, ct.sizeof(
-                et.EVENT_TRACE_PROPERTIES))
+            ct.memmove(self._props, props, ct.sizeof(et.EVENT_TRACE_PROPERTIES))
         else:
             self._props.contents.BufferSize = ring_buf_size
 
@@ -84,20 +81,17 @@ class TraceProperties:
             self._props.contents.LogFileMode = et.EVENT_TRACE_REAL_TIME_MODE
 
         self._props.contents.Wnode.BufferSize = buf_size
-        self._props.contents.LoggerNameOffset = ct.sizeof(
-            et.EVENT_TRACE_PROPERTIES)
+        self._props.contents.LoggerNameOffset = ct.sizeof(et.EVENT_TRACE_PROPERTIES)
 
     def __eq__(self, other):
         for field in self.get().contents._fields_:
             attr_name = field[0]
-            a, b = getattr(self.get().contents, attr_name), getattr(
-                other.get().contents, attr_name)
+            a, b = getattr(self.get().contents, attr_name), getattr(other.get().contents, attr_name)
             is_wnode = isinstance(a, ws.WNODE_HEADER)
             if is_wnode is True:
                 for wnode_field in a._fields_:
                     wnode_attr_name = wnode_field[0]
-                    a_wnode, b_wnode = getattr(
-                        a, wnode_attr_name), getattr(b, wnode_attr_name)
+                    a_wnode, b_wnode = getattr(a, wnode_attr_name), getattr(b, wnode_attr_name)
                     if a_wnode != b_wnode:
                         return False
             else:
@@ -174,8 +168,7 @@ class EventProvider:
             else:
                 self.session_properties.get().contents.EnableFlags = et.DEFAULT_NT_KERNEL_LOGGER_FLAGS
 
-        status = et.StartTraceW(ct.byref(
-            self.session_handle), self.session_name, self.session_properties.get())
+        status = et.StartTraceW(ct.byref(self.session_handle), self.session_name, self.session_properties.get())
         if status != tdh.ERROR_SUCCESS:
             if self.kernel_trace is True and status == tdh.ERROR_ALREADY_EXISTS:
                 self.kernel_trace_was_running = True
@@ -294,16 +287,14 @@ class EventConsumer:
         if not trace_logfile:
             # Construct the EVENT_TRACE_LOGFILE structure
             self.trace_logfile = et.EVENT_TRACE_LOGFILE()
-            self.trace_logfile.ProcessTraceMode = (
-                ec.PROCESS_TRACE_MODE_REAL_TIME | ec.PROCESS_TRACE_MODE_EVENT_RECORD)
+            self.trace_logfile.ProcessTraceMode = (ec.PROCESS_TRACE_MODE_REAL_TIME | ec.PROCESS_TRACE_MODE_EVENT_RECORD)
             self.trace_logfile.LoggerName = logger_name
         else:
             self.trace_logfile = trace_logfile
 
         if not self.trace_logfile.EventRecordCallback and \
            self.trace_logfile.ProcessTraceMode & (ec.PROCESS_TRACE_MODE_REAL_TIME | ec.PROCESS_TRACE_MODE_EVENT_RECORD):
-            self.trace_logfile.EventRecordCallback = et.EVENT_RECORD_CALLBACK(
-                self._processEvent)
+            self.trace_logfile.EventRecordCallback = et.EVENT_RECORD_CALLBACK(self._processEvent)
 
     def add_pid_whitelist(self, pid):
         self.pid_whitelist.add(pid)
@@ -341,8 +332,7 @@ class EventConsumer:
 
         # For whatever reason, the restype is ignored
         self.trace_handle = et.TRACEHANDLE(self.trace_handle)
-        self.process_thread = threading.Thread(
-            target=self._run, args=(self.trace_handle, self.end_capture))
+        self.process_thread = threading.Thread(target=self._run, args=(self.trace_handle, self.end_capture))
         self.process_thread.daemon = True
         self.process_thread.start()
 
@@ -374,8 +364,7 @@ class EventConsumer:
                  RETURN_ONLY_RAW_DATA_ON_ERROR,
                  RETURN_RAW_UNFORMATTED_DATA]
         if flag not in flags:
-            raise Exception(
-                'Callback flag value {:d} passed into EventConsumer is invalid'.format(flag))
+            raise Exception('Callback flag value {:d} passed into EventConsumer is invalid'.format(flag))
         return flag
 
     @staticmethod
@@ -391,7 +380,7 @@ class EventConsumer:
             if tdh.ERROR_SUCCESS != et.ProcessTrace(ct.byref(trace_handle), 1, None, None):
                 end_capture.set()
 
-            if end_capture.is_set():
+            if end_capture.isSet():
                 break
 
     @staticmethod
@@ -408,13 +397,10 @@ class EventConsumer:
         buffer_size = wt.DWORD()
 
         # Call TdhGetEventInformation once to get the required buffer size and again to actually populate the structure.
-        status = tdh.TdhGetEventInformation(
-            record, 0, None, None, ct.byref(buffer_size))
+        status = tdh.TdhGetEventInformation(record, 0, None, None, ct.byref(buffer_size))
         if tdh.ERROR_INSUFFICIENT_BUFFER == status:
-            info = ct.cast((ct.c_byte * buffer_size.value)(),
-                           ct.POINTER(tdh.TRACE_EVENT_INFO))
-            status = tdh.TdhGetEventInformation(
-                record, 0, None, info, ct.byref(buffer_size))
+            info = ct.cast((ct.c_byte * buffer_size.value)(), ct.POINTER(tdh.TRACE_EVENT_INFO))
+            status = tdh.TdhGetEventInformation(record, 0, None, info, ct.byref(buffer_size))
 
         if tdh.ERROR_SUCCESS != status:
             raise ct.WinError(status)
@@ -432,8 +418,7 @@ class EventConsumer:
         :param event_property: The EVENT_PROPERTY_INFO structure for the TopLevelProperty of the event we are parsing
         :return: Returns a DWORD representing the size of the array or None on error.
         """
-        event_property_array = ct.cast(
-            info.contents.EventPropertyInfoArray, ct.POINTER(tdh.EVENT_PROPERTY_INFO))
+        event_property_array = ct.cast(info.contents.EventPropertyInfoArray, ct.POINTER(tdh.EVENT_PROPERTY_INFO))
         flags = event_property.Flags
 
         if flags & tdh.PropertyParamCount:
@@ -442,17 +427,14 @@ class EventConsumer:
             property_size = wt.DWORD()
             count = wt.DWORD()
 
-            data_descriptor.PropertyName = info + \
-                event_property_array[j].NameOffset
+            data_descriptor.PropertyName = info + event_property_array[j].NameOffset
             data_descriptor.ArrayIndex = MAX_UINT
 
-            status = tdh.TdhGetPropertySize(record, 0, None, 1, ct.byref(
-                data_descriptor), ct.byref(property_size))
+            status = tdh.TdhGetPropertySize(record, 0, None, 1, ct.byref(data_descriptor), ct.byref(property_size))
             if tdh.ERROR_SUCCESS != status:
                 raise ct.WinError(status)
 
-            status = tdh.TdhGetProperty(record, 0, None, 1, ct.byref(
-                data_descriptor), property_size, ct.byref(count))
+            status = tdh.TdhGetProperty(record, 0, None, 1, ct.byref(data_descriptor), property_size, ct.byref(count))
             if tdh.ERROR_SUCCESS != status:
                 raise ct.WinError(status)
             return count
@@ -478,19 +460,16 @@ class EventConsumer:
 
         if flags & tdh.PropertyParamLength:
             data_descriptor = tdh.PROPERTY_DATA_DESCRIPTOR()
-            event_property_array = ct.cast(
-                info.contents.EventPropertyInfoArray, ct.POINTER(tdh.EVENT_PROPERTY_INFO))
+            event_property_array = ct.cast(info.contents.EventPropertyInfoArray, ct.POINTER(tdh.EVENT_PROPERTY_INFO))
             j = wt.DWORD(event_property.epi_u3.length)
             property_size = ct.c_ulong()
             length = wt.DWORD()
 
             # Setup the PROPERTY_DATA_DESCRIPTOR structure
-            data_descriptor.PropertyName = (
-                ct.cast(info, ct.c_voidp).value + event_property_array[j.value].NameOffset)
+            data_descriptor.PropertyName = (ct.cast(info, ct.c_voidp).value + event_property_array[j.value].NameOffset)
             data_descriptor.ArrayIndex = MAX_UINT
 
-            status = tdh.TdhGetPropertySize(record, 0, None, 1, ct.byref(
-                data_descriptor), ct.byref(property_size))
+            status = tdh.TdhGetPropertySize(record, 0, None, 1, ct.byref(data_descriptor), ct.byref(property_size))
             if tdh.ERROR_SUCCESS != status:
                 raise ct.WinError(status)
 
@@ -528,18 +507,14 @@ class EventConsumer:
         :param event_property: The EVENT_PROPERTY_INFO structure for the TopLevelProperty of the event we are parsing
         :return: A tuple of the map_info structure and boolean indicating whether we succeeded or not
         """
-        map_name = rel_ptr_to_str(
-            info, event_property.epi_u1.nonStructType.MapNameOffset)
+        map_name = rel_ptr_to_str(info, event_property.epi_u1.nonStructType.MapNameOffset)
         map_size = wt.DWORD()
         map_info = ct.POINTER(tdh.EVENT_MAP_INFO)()
 
-        status = tdh.TdhGetEventMapInformation(
-            record, map_name, None, ct.byref(map_size))
+        status = tdh.TdhGetEventMapInformation(record, map_name, None, ct.byref(map_size))
         if tdh.ERROR_INSUFFICIENT_BUFFER == status:
-            map_info = ct.cast((ct.c_char * map_size.value)
-                               (), ct.POINTER(tdh.EVENT_MAP_INFO))
-            status = tdh.TdhGetEventMapInformation(
-                record, map_name, map_info, ct.byref(map_size))
+            map_info = ct.cast((ct.c_char * map_size.value)(), ct.POINTER(tdh.EVENT_MAP_INFO))
+            status = tdh.TdhGetEventMapInformation(record, map_name, map_info, ct.byref(map_size))
 
         if tdh.ERROR_SUCCESS == status:
             return map_info, True
@@ -594,8 +569,7 @@ class EventConsumer:
 
         # if there is no data remaining then return
         if user_data_remaining <= 0:
-            logger.warning(
-                'No more user data left, returning none for field {:s}'.format(name_field))
+            logger.warning('No more user data left, returning none for field {:s}'.format(name_field))
             return {name_field: None}
 
         in_type = event_property.epi_u1.nonStructType.InType
@@ -611,15 +585,13 @@ class EventConsumer:
                                        out_type,
                                        ct.c_ushort(property_length),
                                        user_data_remaining,
-                                       ct.cast(
-                                           user_data, ct.POINTER(ct.c_byte)),
+                                       ct.cast(user_data, ct.POINTER(ct.c_byte)),
                                        ct.byref(formatted_data_size),
                                        None,
                                        ct.byref(user_data_consumed))
 
         if status == tdh.ERROR_INSUFFICIENT_BUFFER:
-            formatted_data = ct.cast(
-                (ct.c_char * formatted_data_size.value)(), wt.LPWSTR)
+            formatted_data = ct.cast((ct.c_char * formatted_data_size.value)(), wt.LPWSTR)
             status = tdh.TdhFormatProperty(info,
                                            map_info,
                                            ptr_size,
@@ -627,16 +599,14 @@ class EventConsumer:
                                            out_type,
                                            ct.c_ushort(property_length),
                                            user_data_remaining,
-                                           ct.cast(
-                                               user_data, ct.POINTER(ct.c_byte)),
+                                           ct.cast(user_data, ct.POINTER(ct.c_byte)),
                                            ct.byref(formatted_data_size),
                                            formatted_data,
                                            ct.byref(user_data_consumed))
 
         if status != tdh.ERROR_SUCCESS:
             # We can handle this error and still capture the data.
-            logger.warning(
-                'Failed to get data field data for {:s}, incrementing by reported size'.format(name_field))
+            logger.warning('Failed to get data field data for {:s}, incrementing by reported size'.format(name_field))
             self.index += property_length
             return {name_field: None}
 
@@ -671,26 +641,21 @@ class EventConsumer:
             data_size = record.contents.ExtendedData[i].DataSize
             try:
                 if ext_type == ec.EVENT_HEADER_EXT_TYPE_RELATED_ACTIVITYID:
-                    d = ct.cast(data_ptr, ct.POINTER(
-                        ec.EVENT_EXTENDED_ITEM_RELATED_ACTIVITYID))
-                    result['RelatedActivityID'] = str(
-                        d.contents.RelatedActivityId)
+                    d = ct.cast(data_ptr, ct.POINTER(ec.EVENT_EXTENDED_ITEM_RELATED_ACTIVITYID))
+                    result['RelatedActivityID'] = str(d.contents.RelatedActivityId)
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_SID:
                     buff = ct.create_string_buffer(data_size)
                     ct.memmove(buff, data_ptr, data_size)
                     sid_string = wt.LPWSTR()
-                    res = et.ConvertSidToStringSidW(
-                        ct.cast(buff, ct.c_void_p), ct.byref(sid_string))
+                    res = et.ConvertSidToStringSidW(ct.cast(buff, ct.c_void_p), ct.byref(sid_string))
                     if res > 0:
                         result['SID'] = str(sid_string.value)
                         et.LocalFree(sid_string)
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_TS_ID:
-                    d = ct.cast(data_ptr, ct.POINTER(
-                        ec.EVENT_EXTENDED_ITEM_TS_ID))
+                    d = ct.cast(data_ptr, ct.POINTER(ec.EVENT_EXTENDED_ITEM_TS_ID))
                     result['TSID'] = d.contents.SessionId
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_INSTANCE_INFO:
-                    d = ct.cast(data_ptr, ct.POINTER(
-                        ec.EVENT_EXTENDED_ITEM_INSTANCE))
+                    d = ct.cast(data_ptr, ct.POINTER(ec.EVENT_EXTENDED_ITEM_INSTANCE))
                     instance = {
                         'InstanceId': d.contents.InstanceId,
                         'ParentInstanceId': d.contents.ParentInstanceId,
@@ -698,13 +663,10 @@ class EventConsumer:
                     }
                     result['InstanceInfo'] = instance
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_STACK_TRACE32:
-                    nb_address = int(
-                        (data_size - ct.sizeof(ct.c_ulonglong)) / ct.sizeof(ct.c_ulong))
-                    d = ct.cast(data_ptr, ct.POINTER(
-                        ec.EVENT_EXTENDED_ITEM_STACK_TRACE32))
+                    nb_address = int((data_size - ct.sizeof(ct.c_ulonglong)) / ct.sizeof(ct.c_ulong))
+                    d = ct.cast(data_ptr, ct.POINTER(ec.EVENT_EXTENDED_ITEM_STACK_TRACE32))
                     match_id = d.contents.MatchId
-                    addr_buf = ct.cast(ct.addressof(
-                        d.contents.Address), ct.POINTER((ct.c_ulong * nb_address)))
+                    addr_buf = ct.cast(ct.addressof(d.contents.Address), ct.POINTER((ct.c_ulong * nb_address)))
                     addr_list = []
                     for j in range(nb_address):
                         addr_list.append(addr_buf.contents[j])
@@ -713,13 +675,10 @@ class EventConsumer:
                         'Address': addr_list
                     }
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_STACK_TRACE64:
-                    nb_address = int(
-                        (data_size - ct.sizeof(ct.c_ulonglong)) / ct.sizeof(ct.c_ulonglong))
-                    d = ct.cast(data_ptr, ct.POINTER(
-                        ec.EVENT_EXTENDED_ITEM_STACK_TRACE64))
+                    nb_address = int((data_size - ct.sizeof(ct.c_ulonglong)) / ct.sizeof(ct.c_ulonglong))
+                    d = ct.cast(data_ptr, ct.POINTER(ec.EVENT_EXTENDED_ITEM_STACK_TRACE64))
                     match_id = d.contents.MatchId
-                    addr_buf = ct.cast(ct.addressof(d.contents.Address), ct.POINTER(
-                        (ct.c_ulonglong * nb_address)))
+                    addr_buf = ct.cast(ct.addressof(d.contents.Address), ct.POINTER((ct.c_ulonglong * nb_address)))
                     addr_list = []
                     for j in range(nb_address):
                         addr_list.append(addr_buf.contents[j])
@@ -728,13 +687,11 @@ class EventConsumer:
                         'Address': addr_list
                     }
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_PEBS_INDEX:
-                    d = ct.cast(data_ptr, ct.POINTER(
-                        ec.EVENT_EXTENDED_ITEM_PEBS_INDEX))
+                    d = ct.cast(data_ptr, ct.POINTER(ec.EVENT_EXTENDED_ITEM_PEBS_INDEX))
                     result['PebsIndex'] = d.contents.PebsIndex
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_PMC_COUNTERS:
                     nb_counters = int(data_size / ct.sizeof(ct.c_ulonglong))
-                    counters_buf = ct.cast(data_ptr, ct.POINTER(
-                        (ct.c_ulonglong * nb_counters)))
+                    counters_buf = ct.cast(data_ptr, ct.POINTER((ct.c_ulonglong * nb_counters)))
                     counters_list = []
                     for j in range(nb_counters):
                         counters_list.append(counters_buf.contents[j])
@@ -742,20 +699,17 @@ class EventConsumer:
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_PSM_KEY:
                     pass
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_EVENT_KEY:
-                    d = ct.cast(data_ptr, ct.POINTER(
-                        ec.EVENT_EXTENDED_ITEM_EVENT_KEY))
+                    d = ct.cast(data_ptr, ct.POINTER(ec.EVENT_EXTENDED_ITEM_EVENT_KEY))
                     result['EventKey'] = d.contents.Key
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_EVENT_SCHEMA_TL:
                     pass
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_PROV_TRAITS:
                     pass
                 elif ext_type == ec.EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY:
-                    d = ct.cast(data_ptr, ct.POINTER(
-                        ec.EVENT_EXTENDED_ITEM_PROCESS_START_KEY))
+                    d = ct.cast(data_ptr, ct.POINTER(ec.EVENT_EXTENDED_ITEM_PROCESS_START_KEY))
                     result['StartKey'] = d.contents.ProcessStartKey
             except Exception as e:
-                logger.warning('Extended data parse error (type %d, size %d) : %s' % (
-                    ext_type, data_size, str(e)))
+                logger.warning('Extended data parse error (type %d, size %d) : %s' % (ext_type, data_size, str(e)))
         return result
 
     def _unpackComplexType(self, record, info, event_property):
@@ -784,8 +738,7 @@ class EventConsumer:
                 event_property_array = ct.cast(info.contents.EventPropertyInfoArray,
                                                ct.POINTER(tdh.EVENT_PROPERTY_INFO))
 
-                key, value = self._unpackSimpleType(
-                    record, info, event_property_array[j])
+                key, value = self._unpackSimpleType(record, info, event_property_array[j])
                 if key is None and value is None:
                     break
 
@@ -872,18 +825,15 @@ class EventConsumer:
                     # Some events do not have an associated task_name value. In this case, we should use the provider
                     # name instead.
                     if info.contents.TaskNameOffset == 0:
-                        task_name = rel_ptr_to_str(
-                            info, info.contents.ProviderNameOffset)
+                        task_name = rel_ptr_to_str(info, info.contents.ProviderNameOffset)
                     else:
-                        task_name = rel_ptr_to_str(
-                            info, info.contents.TaskNameOffset)
+                        task_name = rel_ptr_to_str(info, info.contents.TaskNameOffset)
 
                     task_name = task_name.strip().upper()
 
                     # Add a description for the event, if present
                     if info.contents.EventMessageOffset:
-                        description = rel_ptr_to_str(
-                            info, info.contents.EventMessageOffset)
+                        description = rel_ptr_to_str(info, info.contents.EventMessageOffset)
                     else:
                         description = ''
 
@@ -899,8 +849,7 @@ class EventConsumer:
                     end_of_user_data = user_data + record.contents.UserDataLength
                     self.index = 0
                     self.vfield_length = None
-                    property_array = ct.cast(
-                        info.contents.EventPropertyInfoArray, ct.POINTER(tdh.EVENT_PROPERTY_INFO))
+                    property_array = ct.cast(info.contents.EventPropertyInfoArray, ct.POINTER(tdh.EVENT_PROPERTY_INFO))
 
                     for i in range(info.contents.TopLevelPropertyCount):
                         # If the user_data is the same value as the end_of_user_data, we are ending with a 0-length
@@ -910,11 +859,9 @@ class EventConsumer:
 
                         # Determine whether we are processing a simple type or a complex type and act accordingly
                         if property_array[i].Flags & tdh.PropertyStruct:
-                            field = self._unpackComplexType(
-                                record, info, property_array[i])
+                            field = self._unpackComplexType(record, info, property_array[i])
                         else:
-                            field = self._unpackSimpleType(
-                                record, info, property_array[i])
+                            field = self._unpackSimpleType(record, info, property_array[i])
 
                         if field == {} or None in field.values():
                             field_parse_error = True
@@ -925,8 +872,7 @@ class EventConsumer:
                     parsed_data['Task Name'] = task_name
                     # Add ExtendedData if any
                     if record.contents.EventHeader.Flags & ec.EVENT_HEADER_FLAG_EXTENDED_INFO:
-                        parsed_data['EventExtendedData'] = self._parseExtendedData(
-                            record)
+                        parsed_data['EventExtendedData'] = self._parseExtendedData(record)
 
                     record_parse_error = False
                 except Exception as e:
@@ -1074,8 +1020,7 @@ class ETW:
         """
 
         if self.provider is None:
-            self.provider = EventProvider(
-                self.session_name, self.properties, self.providers)
+            self.provider = EventProvider(self.session_name, self.properties, self.providers)
 
         if self.running is False:
             self.running = True
@@ -1230,7 +1175,6 @@ class ETW:
 
 class ProviderInfo:
     """ Container class for provider info """
-
     def __init__(self, name, guid, level=et.TRACE_LEVEL_INFORMATION, any_keywords=None, all_keywords=None, params=None):
         """
         Initializes an instance of the ProviderInfo class.
@@ -1268,15 +1212,13 @@ class ProviderInfo:
             if other_params:
                 for field in self_params.contents._fields_:
                     attr_name = field[0]
-                    a, b = getattr(self_params.contents, attr_name), getattr(
-                        other_params.contents, attr_name)
-                    is_desc = isinstance(a, ct.POINTER(
-                        ep.EVENT_FILTER_DESCRIPTOR))
+                    a, b = getattr(self_params.contents, attr_name), getattr(other_params.contents, attr_name)
+                    is_desc = isinstance(a, ct.POINTER(ep.EVENT_FILTER_DESCRIPTOR))
                     if is_desc is True:
                         if a:
                             for desc_field in a.contents._fields_:
                                 desc_attr_name = desc_field[0]
-                                a_desc, b_desc = getattr(a.contents, desc_attr_name), \
+                                a_desc, b_desc = getattr(a.contents, desc_attr_name),\
                                     getattr(b.contents, desc_attr_name)
                                 if a_desc != b_desc:
                                     result = False
@@ -1311,8 +1253,7 @@ class ProviderParameters:
 
         self._props = ct.pointer(et.ENABLE_TRACE_PARAMETERS())
 
-        filter_buf_size = ct.sizeof(
-            ep.EVENT_FILTER_DESCRIPTOR) * len(event_filters)
+        filter_buf_size = ct.sizeof(ep.EVENT_FILTER_DESCRIPTOR) * len(event_filters)
         # noinspection PyCallingNonCallable
         filter_buf = (ct.c_char * filter_buf_size)()
         # copy contents to buffer
@@ -1324,22 +1265,19 @@ class ProviderParameters:
         self._props.contents.Version = et.ENABLE_TRACE_PARAMETERS_VERSION_2
         self._props.contents.EnableProperty = event_property
         self._props.contents.ControlFlags = 0
-        self._props.contents.EnableFilterDesc = ct.cast(
-            ct.pointer(filter_buf), ct.POINTER(ep.EVENT_FILTER_DESCRIPTOR))
+        self._props.contents.EnableFilterDesc = ct.cast(ct.pointer(filter_buf), ct.POINTER(ep.EVENT_FILTER_DESCRIPTOR))
         self._props.contents.FilterDescCount = len(event_filters)
 
     def __eq__(self, other):
         for field in self.get().contents._fields_:
             attr_name = field[0]
-            a, b = getattr(self.get().contents, attr_name), getattr(
-                other.get().contents, attr_name)
+            a, b = getattr(self.get().contents, attr_name), getattr(other.get().contents, attr_name)
             is_desc = isinstance(a, ct.POINTER(ep.EVENT_FILTER_DESCRIPTOR))
             if is_desc is True:
                 if a:
                     for desc_field in a.contents._fields_:
                         desc_attr_name = desc_field[0]
-                        a_desc, b_desc = getattr(a.contents, desc_attr_name), getattr(
-                            b.contents, desc_attr_name)
+                        a_desc, b_desc = getattr(a.contents, desc_attr_name), getattr(b.contents, desc_attr_name)
                         if a_desc != b_desc:
                             return False
             else:
@@ -1382,8 +1320,7 @@ def get_keywords_bitmask(guid, keywords):
 
     if status == tdh.ERROR_INSUFFICIENT_BUFFER:
 
-        provider_info = ct.cast(
-            (ct.c_char * providers_size.value)(), ct.POINTER(tdh.PROVIDER_FIELD_INFOARRAY))
+        provider_info = ct.cast((ct.c_char * providers_size.value)(), ct.POINTER(tdh.PROVIDER_FIELD_INFOARRAY))
         status = tdh.TdhEnumerateProviderFieldInformation(
             ct.byref(guid),
             tdh.EventKeywordInformation,
@@ -1394,12 +1331,10 @@ def get_keywords_bitmask(guid, keywords):
         raise ct.WinError(status)
 
     if provider_info:
-        field_info_array = ct.cast(
-            provider_info.contents.FieldInfoArray, ct.POINTER(tdh.PROVIDER_FIELD_INFO))
+        field_info_array = ct.cast(provider_info.contents.FieldInfoArray, ct.POINTER(tdh.PROVIDER_FIELD_INFO))
         provider_keywords = {}
         for i in range(provider_info.contents.NumberOfElements):
-            provider_keyword = rel_ptr_to_str(
-                provider_info, field_info_array[i].NameOffset)
+            provider_keyword = rel_ptr_to_str(provider_info, field_info_array[i].NameOffset)
             provider_keywords[provider_keyword] = field_info_array[i].Value
 
         for keyword in keywords:
@@ -1407,3 +1342,4 @@ def get_keywords_bitmask(guid, keywords):
                 bitmask |= provider_keywords[keyword]
 
     return bitmask
+
